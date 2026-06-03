@@ -5,9 +5,10 @@ import { AsyncHandler } from "../Utils/AsyncHandler.js";
 import { ApiError } from "../Utils/ApiError.js";
 import { ApiResponse } from "../Utils/ApiResponse.js";
 import mongoose from "mongoose";
-import { generateRamdomOtp } from "../Services.js/Otp.service.js";
-import { sendEmail } from "../Services.js/Email.service.js";
-import { GenerateAccessToken } from "../Utils/GenerateToken.js";
+import { generateRamdomOtp,saveOTP } from "../Services.js/Otp.service.js";
+import { sendEmail,sendOTPEmail } from "../Services.js/Email.service.js";
+import { GenerateAccessToken, GenerateRefreshToken ,refreshAccessTokenGenerate} from "../Utils/GenerateToken.js";
+import jwt from "jsonwebtoken"
 
 const registerUser = AsyncHandler(async (req, res) => {
   console.log("Body:", req.body);
@@ -37,71 +38,16 @@ const registerUser = AsyncHandler(async (req, res) => {
     isVerified: false,
   });
 
-  const createdUser = await User.findById(user._id).select("-password ");
+  const createdUser = await User.findById(user._id).select("-password -refreshtoken");
 
   if (!createdUser) {
     throw new ApiError(500, "Somthing went Wrong While registering the user");
   }
 
   const otp = generateRamdomOtp();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
-  const createdOtp = await OTP.create({
-    email,
-    otp,
-    expiresAt,
-  });
-
-  if (!createdOtp) {
-    throw new ApiError(500, "Somthing went Wrong While Creating the OTP");
-  }
-
-  await sendEmail({
-    to: email,
-    subject: "Verify Your Account - OTP",
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width:600px; margin:auto; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-            
-            <div style="background:#2563eb; color:white; padding:20px; text-align:center;">
-                <h1>Account Verification</h1>
-            </div>
-
-            <div style="padding:30px;">
-                <h2>Hello ${name},</h2>
-
-                <p>Thank you for registering with us.</p>
-
-                <p>Please use the following OTP to verify your account:</p>
-
-                <div style="background:#f3f4f6; padding:20px; text-align:center; border-radius:8px; margin:25px 0;">
-                    <h1 style="margin:0; color:#2563eb; letter-spacing:8px;">
-                        ${otp}
-                    </h1>
-                </div>
-
-                <p>
-                    This OTP will expire in
-                    <strong>10 minutes</strong>.
-                </p>
-
-                <p>
-                    If you did not create this account, you can safely ignore this email.
-                </p>
-
-                <br>
-
-                <p>
-                    Regards,<br>
-                    <strong>Rental Management Team</strong>
-                </p>
-            </div>
-
-            <div style="background:#f9fafb; padding:15px; text-align:center; color:#6b7280; font-size:12px;">
-                This is an automated email. Please do not reply.
-            </div>
-        </div>
-    `,
-  });
-
+  const otpType="signup";
+  saveOTP(email,otp,otpType);
+  sendOTPEmail(email,otp,otpType);
   return res.status(201).json(
     new ApiResponse(
       201,
@@ -145,19 +91,26 @@ const verifyOTP = AsyncHandler(async (req, res) => {
   await user.save();
   await OTP.deleteOne({ _id: findotp._id });
 
-  const token = GenerateAccessToken(user._id);
+  const {accesstoken,refreshtoken} = refreshAccessTokenGenerate(user._id);
   const options = {
     httpOnly: true,
     secure: true,
-    maxAge: 604800000,
+    maxAge:  7 * 24 * 60 * 60 * 1000,
+    sameSite: "strict",
+  };
+  const options1 = {
+    httpOnly: true,
+    secure: true,
+    maxAge:  30 * 24 * 60 * 60 * 1000,
     sameSite: "strict",
   };
 
-  const verifiedUser = await User.findById(user._id).select("-password");
+  const verifiedUser = await User.findById(user._id).select("-password -refreshtoken");
 
   return res
     .status(200)
-    .cookie("accesstoken", token, options)
+    .cookie("accesstoken", accesstoken, options)
+    .cookie("refreshtoken", refreshtoken, options1)
     .json(
       new ApiResponse(
         200,
@@ -172,75 +125,10 @@ const verifyOTP = AsyncHandler(async (req, res) => {
 const resendOTP = AsyncHandler(async (req, res) => {
   const { email } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    throw new ApiError(404, "User Not Found");
-    }
-
-    if (user.isVerified) {
-    throw new ApiError(400, "User is already verified");
-  }
-    await OTP.deleteMany({ email });
-
-
   const otp = generateRamdomOtp();
-  const expiresAt = Date.now() + 10 * 60 * 1000;
-  const createdOtp = await OTP.create({
-    email,
-    otp,
-    expiresAt,
-  });
-
-  if (!createdOtp) {
-    throw new ApiError(500, "Somthing went Wrong While Creating the OTP");
-  }
-
-  await sendEmail({
-    to: email,
-    subject: "Verify Your Account With  ReSend OTP",
-    html: `
-        <div style="font-family: Arial, sans-serif; max-width:600px; margin:auto; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-            
-            <div style="background:#2563eb; color:white; padding:20px; text-align:center;">
-                <h1>Account Verification</h1>
-            </div>
-
-            <div style="padding:30px;">
-                <h2>Hello ${user.name},</h2>
-
-                <p>Thank you for registering with us.</p>
-
-                <p>Please use the following OTP to verify your account:</p>
-
-                <div style="background:#f3f4f6; padding:20px; text-align:center; border-radius:8px; margin:25px 0;">
-                    <h1 style="margin:0; color:#2563eb; letter-spacing:8px;">
-                        ${otp}
-                    </h1>
-                </div>
-
-                <p>
-                    This OTP will expire in
-                    <strong>10 minutes</strong>.
-                </p>
-
-                <p>
-                    If you did not create this account, you can safely ignore this email.
-                </p>
-
-                <br>
-
-                <p>
-                    Regards,<br>
-                    <strong>Rental Management Team</strong>
-                </p>
-            </div>
-
-            <div style="background:#f9fafb; padding:15px; text-align:center; color:#6b7280; font-size:12px;">
-                This is an automated email. Please do not reply.
-            </div>
-        </div>
-    `,
-  });
+  const otpType="signup";
+  saveOTP(email,otp,otpType);
+  sendOTPEmail(email,otp,otpType);
 
   return res.status(201).json(
     new ApiResponse(
@@ -275,24 +163,31 @@ const loginUser=AsyncHandler(async (req,res)=>{
         throw new ApiError(401,"Invalid credentials");
     }
 
-    const token=GenerateAccessToken(user._id);
+    const {accesstoken,refreshtoken} =await refreshAccessTokenGenerate(user._id);
     const options = {
     httpOnly: true,
     secure: true,
-    maxAge: 604800000,
+    maxAge:  7 * 24 * 60 * 60 * 1000,  
+    sameSite: "strict",
+  };
+    const options1 = {
+    httpOnly: true,
+    secure: true,
+    maxAge:  30 * 24 * 60 * 60 * 1000,  
     sameSite: "strict",
   };
 
-  const newUser = await User.findById(user._id).select("-password");
+  const newUser = await User.findById(user._id).select("-password -refreshtoken");
 
   return res
     .status(200)
-    .cookie("accesstoken", token, options)
+    .cookie("accesstoken", accesstoken, options)
+    .cookie("refreshtoken", refreshtoken, options1)
     .json(
       new ApiResponse(
         200,
         {
-          "user":newUser
+          "user":newUser,accesstoken,refreshtoken
         },
         "user logged in successfully"
       )
@@ -300,14 +195,33 @@ const loginUser=AsyncHandler(async (req,res)=>{
 })
 
 const logoutUser=AsyncHandler(async(req,res)=>{
+    await User.findByIdAndUpdate(req.user._id,
+        {
+            $unset:{
+                refreshtoken:1
+            }
+        },
+        {
+            new: true
+        }
+    )
     const options = {
         httpOnly: true,
         secure: true,
-        maxAge: 604800000,
+        maxAge:  7 * 24 * 60 * 60 * 1000,
+        sameSite: "strict",
+    };
+    const options1 = {
+        httpOnly: true,
+        secure: true,
+        maxAge:  30 * 24 * 60 * 60 * 1000,
         sameSite: "strict",
     };
 
-    return res.status(200).clearCookie("accesstoken",options).json(new ApiResponse(200,{},"User Logout SuccesFully"))
+    return res.status(200)
+    .clearCookie("accesstoken",options)
+    .clearCookie("refreshtoken",options1)
+    .json(new ApiResponse(200,{},"User Logout SuccesFully"))
 })
 
 const forgotPassword=AsyncHandler(async(req,res)=>{
@@ -318,60 +232,11 @@ const forgotPassword=AsyncHandler(async(req,res)=>{
         throw new ApiError(404,"User Not Found");
     }
 
-    await OTP.deleteMany({email});
     const otp=generateRamdomOtp();
-    const expiresAt=Date.now()+(15*60*1000);
-    const resetopt=await OTP.create({
-        email,
-        otp,
-        expiresAt,
-        type:"reset"
-    })
+    const type="reset"
+    saveOTP(email,otp,type)  
+    sendOTPEmail(email,otp,type);
 
-    await sendEmail({to:email,subject:"To Forgot the Password OTP",
-        html: `
-        <div style="font-family: Arial, sans-serif; max-width:600px; margin:auto; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden;">
-            
-            <div style="background:#2563eb; color:white; padding:20px; text-align:center;">
-                <h1>Account Verification</h1>
-            </div>
-
-            <div style="padding:30px;">
-                <h2>Hello ${user.name},</h2>
-
-                <p>Thank you for registering with us.</p>
-
-                <p>Please use the following OTP to verify your account:</p>
-
-                <div style="background:#f3f4f6; padding:20px; text-align:center; border-radius:8px; margin:25px 0;">
-                    <h1 style="margin:0; color:#2563eb; letter-spacing:8px;">
-                        ${otp}
-                    </h1>
-                </div>
-
-                <p>
-                    This OTP will expire in
-                    <strong>15 minutes</strong>.
-                </p>
-
-                <p>
-                    If you did not create this account, you can safely ignore this email.
-                </p>
-
-                <br>
-
-                <p>
-                    Regards,<br>
-                    <strong>Rental Management Team</strong>
-                </p>
-            </div>
-
-            <div style="background:#f9fafb; padding:15px; text-align:center; color:#6b7280; font-size:12px;">
-                This is an automated email. Please do not reply.
-            </div>
-        </div>
-    `
-    })
     return res.status(200).json(new ApiResponse(200,{
         success:true
     },"forgotPassword OTP sent successfully"))
@@ -409,4 +274,61 @@ const resetPassword=AsyncHandler(async(req,res)=>{
     return res.status(200).json(new ApiResponse( 200,{success:true}, "Password reset successful"))
 })
 
-export {registerUser,verifyOTP,resendOTP,loginUser,logoutUser,forgotPassword,resetPassword} 
+const refreshAccessToken = AsyncHandler(async (req, res) => {
+
+    const refreshToken = req.cookies.refreshtoken;
+
+    if (!refreshToken) {
+        throw new ApiError(401, "Refresh token not found");
+    }
+
+    let decodedToken;
+
+    try {
+        decodedToken = jwt.verify(
+            refreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        );
+    } catch (error) {
+        throw new ApiError(401, "Invalid or expired refresh token");
+    }
+
+    const user = await User.findById(decodedToken._id);
+
+    if (!user) {
+        throw new ApiError(401, "User not found");
+    }
+
+    if (user.refreshtoken !== refreshToken) {
+        throw new ApiError(
+            401,
+            "Refresh token is expired or used"
+        );
+    }
+
+    if (user.isBlocked) {
+        throw new ApiError(403, "User is blocked");
+    }
+
+    const accessToken = GenerateAccessToken(user._id);
+
+    const options = {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    };
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                { accessToken },
+                "Access token refreshed successfully"
+            )
+        );
+});
+
+export {registerUser,verifyOTP,resendOTP,loginUser,logoutUser,forgotPassword,resetPassword,refreshAccessToken} 

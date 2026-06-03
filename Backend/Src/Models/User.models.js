@@ -45,6 +45,9 @@ const Userschema=new Schema({
     invoiceAddress:{
         type:String,
     },
+    refreshtoken:{
+        type:String
+    }
 },{timestamps:true})
 
 Userschema.pre("save", async function () {
