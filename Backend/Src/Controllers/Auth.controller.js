@@ -115,7 +115,7 @@ const verifyOTP = AsyncHandler(async (req, res) => {
       new ApiResponse(
         200,
         {
-          verifiedUser,
+          "user":verifiedUser,
         },
         "user Created SuccesFully"
       )
