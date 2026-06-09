@@ -11,7 +11,7 @@ import { GenerateAccessToken, GenerateRefreshToken ,refreshAccessTokenGenerate} 
 import jwt from "jsonwebtoken"
 
 const registerUser = AsyncHandler(async (req, res) => {
-  console.log("Body:", req.body);
+  // console.log("Body:", req.body);
   const { name, email, password, phone, role } = req.body;
   if (
     [name, email, password, phone, role].some((filed) => {

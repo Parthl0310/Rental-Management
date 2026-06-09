@@ -1,11 +1,11 @@
-import express from "express"
-import cors from "cors"
-import cookieParser from "cookie-parser"
 import dotenv from "dotenv"
 
 dotenv.config({
     path:"./.env"
 });
+import express from "express"
+import cors from "cors"
+import cookieParser from "cookie-parser"
 
 const app=express()
 
@@ -21,6 +21,8 @@ app.use(cookieParser())
 
 import authRouter from "./Routes/auth.routes.js"
 import userRoute from "./Routes/User.routes.js"
+import productRoute from "./Routes/product.routes.js"
 app.use('/api/auth',authRouter)
 app.use('/api/user',userRoute)
+app.use('/api/products',productRoute)
 export {app}
