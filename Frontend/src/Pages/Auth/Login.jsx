@@ -43,17 +43,15 @@ export default function Login() {
       setIsLoading(true);
 
       const response = await loginAPI(formData);
-
-      const userData = response.data || response.user;
+      const userData = response?.data?.user;
 
       setUser(userData);
-
       toast.success("Login successful");
 
       if (userData?.role === "admin") {
-        navigate("/");
+        navigate("/admin/");
       } else {
-        navigate("/");
+        navigate("/customer/");
       }
     } catch (err) {
       const message = err?.response?.data?.message || "Login failed";

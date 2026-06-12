@@ -43,7 +43,8 @@ function App() {
               <CustomerDashboard />
             </ProtectedRoute>
           }
-        />
+        >
+        </Route>
 
         {/* Admin Routes */}
         <Route

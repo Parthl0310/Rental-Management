@@ -121,7 +121,9 @@ const getAllProducts = AsyncHandler(async (req, res) => {
 
   // Category Filter
   if (category) {
-    query.category = category;
+    query.category = {
+      $in: category.split(","),
+    };
   }
 
   // Price Filter
@@ -168,7 +170,6 @@ const getAllProducts = AsyncHandler(async (req, res) => {
     .sort(sortOptions)
     .skip((currentPage - 1) * pageLimit)
     .limit(pageLimit);
-
   const totalProducts = await Product.countDocuments(query);
 
   const totalPages = Math.ceil(totalProducts / pageLimit);
@@ -324,51 +325,51 @@ const deleteProduct = AsyncHandler(async (req, res) => {
     )
 });
 
-const updateStock = AsyncHandler(async (req, res) => {
-    const { id, totalStock } = req.body;
+  const updateStock = AsyncHandler(async (req, res) => {
+      const { id, totalStock } = req.body;
 
-    const product = await Product.findById(id);
+      const product = await Product.findById(id);
 
-    if (!product) {
-        throw new ApiError(404, "Product Is Not Found");
-    }
+      if (!product) {
+          throw new ApiError(404, "Product Is Not Found");
+      }
 
-    const stock = Number(totalStock);
+      const stock = Number(totalStock);
 
-    if (isNaN(stock) || stock < 0) {
-        throw new ApiError(400, "Invalid Product Stock");
-    }
+      if (isNaN(stock) || stock < 0) {
+          throw new ApiError(400, "Invalid Product Stock");
+      }
 
-    const availableStock = stock;
+      const availableStock = stock;
 
-    // TODO Day 8: Recalculate availableStock as totalStock - activeRentalCount
-    // activeRentalCount = RentalOrder.countDocuments({
-    //     product: id,
-    //     status: { $in: ["reserved", "pickedup"] }
-    // })
+      // TODO Day 8: Recalculate availableStock as totalStock - activeRentalCount
+      // activeRentalCount = RentalOrder.countDocuments({
+      //     product: id,
+      //     status: { $in: ["reserved", "pickedup"] }
+      // })
 
-    const updatedProduct = await Product.findByIdAndUpdate(
-        id,
-        {
-            totalStock: stock,
-            availableStock,
-        },
-        {
-            new: true,
-            runValidators: true,
-        }
-    );
+      const updatedProduct = await Product.findByIdAndUpdate(
+          id,
+          {
+              totalStock: stock,
+              availableStock,
+          },
+          {
+              new: true,
+              runValidators: true,
+          }
+      );
 
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            {
-                product: updatedProduct,
-            },
-            "Product Stock Updated Successfully"
-        )
-    );
-});
+      return res.status(200).json(
+          new ApiResponse(
+              200,
+              {
+                  product: updatedProduct,
+              },
+              "Product Stock Updated Successfully"
+          )
+      );
+  });
 
 
 const getProductAvailability=AsyncHandler(async(req,res)=>{
