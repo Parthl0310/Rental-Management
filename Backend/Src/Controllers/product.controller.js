@@ -3,7 +3,8 @@ import { AsyncHandler } from "../Utils/AsyncHandler.js";
 import { ApiError } from "../Utils/ApiError.js";
 import { ApiResponse } from "../Utils/ApiResponse.js";
 import { uploadoncloudinary } from "../Config/cloudinary.js";
-import { calculateRentalPrice } from "../Services.js/pricing.service.js";
+import { calculateRentalPrice,applyDiscount } from "../Services.js/pricing.service.js";
+import { PriceList } from "../Models/Pricelist.model.js";
 
 const createProduct = AsyncHandler(async (req, res) => {
   const {
@@ -78,7 +79,7 @@ const createProduct = AsyncHandler(async (req, res) => {
   });
 
   if (!product) {
-    throw new ApiError(500, "Something Went Wrong While Creating the Product");
+    throw new ApiError( );
   }
   return res
     .status(201)
@@ -325,7 +326,7 @@ const deleteProduct = AsyncHandler(async (req, res) => {
     )
 });
 
-  const updateStock = AsyncHandler(async (req, res) => {
+const updateStock = AsyncHandler(async (req, res) => {
       const { id, totalStock } = req.body;
 
       const product = await Product.findById(id);
@@ -369,7 +370,7 @@ const deleteProduct = AsyncHandler(async (req, res) => {
               "Product Stock Updated Successfully"
           )
       );
-  });
+});
 
 
 const getProductAvailability=AsyncHandler(async(req,res)=>{
@@ -395,23 +396,52 @@ const getProductAvailability=AsyncHandler(async(req,res)=>{
 })
 
 const calculatePrice = AsyncHandler(async (req, res) => {
-    const { id, startDate, endDate, quantity } = req.body;
+  const {
+    id,
+    startDate,
+    endDate,
+    quantity,
+    pricelistId,
+  } = req.body;
 
-    const product = await Product.findById(id);
+  const product = await Product.findById(id);
 
-    if (!product) {
-        throw new ApiError(404, "Product Is Not Found");
-    }
+  if (!product) {
+    throw new ApiError(404, "Product Is Not Found");
+  }
 
-    const calculatedPrice=calculateRentalPrice(product,startDate,endDate,quantity);    
+  let priceList = null;
 
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            calculatedPrice,
-            "Price calculated successfully"
-        )
-    );
+  if (pricelistId) {
+    priceList = await PriceList.findById(pricelistId);
+  }
+
+  const calculatedPrice = calculateRentalPrice(
+    product,
+    startDate,
+    endDate,
+    quantity
+  );
+
+  const {
+    discountedAmount,
+    discountAmount,
+  } = applyDiscount(
+    calculatedPrice.baseAmount,
+    priceList
+  );
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        ...calculatedPrice,
+        discountedAmount,
+        discountAmount,
+      },
+      "Price calculated successfully"
+    )
+  );
 });
 
 export {

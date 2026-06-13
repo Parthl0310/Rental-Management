@@ -22,7 +22,10 @@ app.use(cookieParser())
 import authRouter from "./Routes/auth.routes.js"
 import userRoute from "./Routes/User.routes.js"
 import productRoute from "./Routes/product.routes.js"
+import pricelistRoute from "./Routes/pricelist.routes.js"
+
 app.use('/api/auth',authRouter)
 app.use('/api/user',userRoute)
 app.use('/api/products',productRoute)
+app.use('/api/pricelists',pricelistRoute)
 export {app}
