@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import AdminProducts from "../Components/Admin/AdminProducts";
 import AdminAddProduct from "../Components/Admin/AdminAddProduct";
 import AdminEditProduct from "../Components/Admin/AdminEditProduct";
+import AdminPricelists from "../Components/Admin/AdminPricelists";
 
 function AdminDashboard() {
   return (
@@ -34,6 +35,10 @@ function AdminDashboard() {
         element={<AdminEditProduct />}
       />
 
+      <Route
+        path="pricelists"
+        element={<AdminPricelists />}
+      />
     </Routes>
   );
 }

@@ -64,7 +64,8 @@ const getAllPricelists = AsyncHandler(async (req, res) => {
     filter.isActive = isActive === "true";
   }
 
-  const allPricelists = await PriceList.find(filter);
+  const allPricelists = await PriceList.find(filter)
+  .populate("product", "productName");
 
   return res.status(200).json(
     new ApiResponse(
@@ -88,7 +89,9 @@ const getActivePricelists= AsyncHandler(async(req,res)=>{
         $gte:today
     }
 
-    const activePriceList=await PriceList.find(query)
+   const activePriceList = await PriceList.find(query)
+  .populate("product", "productName");
+  
     return res.status(200).json(
     new ApiResponse(
       200,

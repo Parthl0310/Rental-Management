@@ -3,8 +3,12 @@ import { AsyncHandler } from "../Utils/AsyncHandler.js";
 import { ApiError } from "../Utils/ApiError.js";
 import { ApiResponse } from "../Utils/ApiResponse.js";
 import { uploadoncloudinary } from "../Config/cloudinary.js";
-import { calculateRentalPrice,applyDiscount } from "../Services.js/pricing.service.js";
+import {
+  calculateRentalPrice,
+  applyDiscount,
+} from "../Services.js/pricing.service.js";
 import { PriceList } from "../Models/Pricelist.model.js";
+import { RentalOrder } from "../Models/RentalOrder.model.js";
 
 const createProduct = AsyncHandler(async (req, res) => {
   const {
@@ -37,9 +41,8 @@ const createProduct = AsyncHandler(async (req, res) => {
 
   const imageUrls = [];
   for (const file of req.files) {
-
-      const uploadedImage = await uploadoncloudinary(file.path);
-    //   console.log(uploadedImage  );   
+    const uploadedImage = await uploadoncloudinary(file.path);
+    //   console.log(uploadedImage  );
 
     if (!uploadedImage) {
       throw new ApiError(500, "Error while uploading product image");
@@ -79,7 +82,7 @@ const createProduct = AsyncHandler(async (req, res) => {
   });
 
   if (!product) {
-    throw new ApiError( );
+    throw new ApiError();
   }
   return res
     .status(201)
@@ -288,14 +291,10 @@ const updateProduct = AsyncHandler(async (req, res) => {
     images: imageUrls.length > 0 ? imageUrls : product.images,
   };
 
-  const updatedProduct = await Product.findByIdAndUpdate(
-    id,
-    updateData,
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
+  const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  });
 
   return res.status(200).json(
     new ApiResponse(
@@ -309,100 +308,102 @@ const updateProduct = AsyncHandler(async (req, res) => {
 });
 
 const deleteProduct = AsyncHandler(async (req, res) => {
-    const {id}=req.params;
+  const { id } = req.params;
 
-    const product=await Product.findById(id);
-    if (!product) {
-        throw new ApiError(404, "Product Is Not Found");
-    }
-    // TODO: Check active rentals on Day 8 when RentalOrder model is ready
-    
-    const deleteProduct=await Product.findByIdAndDelete(id);
-    if (!deleteProduct) {
-        throw new ApiError(404, "Failed to delete product");
-    }
-    return res.status(200).json(
-        new ApiResponse(200,deleteProduct,"Product Deleted SuccesFully")
-    )
+  const product = await Product.findById(id);
+  if (!product) {
+    throw new ApiError(404, "Product Is Not Found");
+  }
+
+  const foundOrder=await RentalOrder.exists({product:id,status:{
+    $nin:["cancelled","returned"]
+  }})
+
+  if(foundOrder){
+    throw new ApiError(400, "Cannot delete product with active rentals");
+  }
+
+  const deleteProduct = await Product.findByIdAndDelete(id);
+  if (!deleteProduct) {
+    throw new ApiError(404, "Failed to delete product");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, deleteProduct, "Product Deleted SuccesFully"));
 });
 
 const updateStock = AsyncHandler(async (req, res) => {
-      const { id, totalStock } = req.body;
+  const { id, totalStock } = req.body;
 
-      const product = await Product.findById(id);
+  const product = await Product.findById(id);
 
-      if (!product) {
-          throw new ApiError(404, "Product Is Not Found");
-      }
+  if (!product) {
+    throw new ApiError(404, "Product Is Not Found");
+  }
 
-      const stock = Number(totalStock);
+  const stock = Number(totalStock);
 
-      if (isNaN(stock) || stock < 0) {
-          throw new ApiError(400, "Invalid Product Stock");
-      }
+  if (isNaN(stock) || stock < 0) {
+    throw new ApiError(400, "Invalid Product Stock");
+  }
 
-      const availableStock = stock;
+  
+  const activeRentalCount =await  RentalOrder.countDocuments({
+    product: id,
+    status: { $in: ["reserved", "pickedup"] }
+  })
+  const availableStock = stock-activeRentalCount;
 
-      // TODO Day 8: Recalculate availableStock as totalStock - activeRentalCount
-      // activeRentalCount = RentalOrder.countDocuments({
-      //     product: id,
-      //     status: { $in: ["reserved", "pickedup"] }
-      // })
+  if (availableStock < 0) {
+    availableStock = 0;
+  }
+  
+  const updatedProduct = await Product.findByIdAndUpdate(
+    id,
+    {
+      totalStock: stock,
+      availableStock,
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
 
-      const updatedProduct = await Product.findByIdAndUpdate(
-          id,
-          {
-              totalStock: stock,
-              availableStock,
-          },
-          {
-              new: true,
-              runValidators: true,
-          }
-      );
-
-      return res.status(200).json(
-          new ApiResponse(
-              200,
-              {
-                  product: updatedProduct,
-              },
-              "Product Stock Updated Successfully"
-          )
-      );
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        product: updatedProduct,
+      },
+      "Product Stock Updated Successfully"
+    )
+  );
 });
 
+const getProductAvailability = AsyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-const getProductAvailability=AsyncHandler(async(req,res)=>{
-    const {id}=req.params;
+  const product = await Product.findById(id);
 
-    const product = await Product.findById(id);
+  if (!product) {
+    throw new ApiError(404, "Product Is Not Found");
+  }
 
-    if (!product) {
-        throw new ApiError(404, "Product Is Not Found");
-    }
+  const bookedDates = await RentalOrder.find({
+    product: id,
+    status: { $nin: ["cancelled", "returned"] }
+  }).select("startDate endDate -_id")
 
-    // TODO Day 8: Query RentalOrder for booked date ranges
-    // const bookedDates = await RentalOrder.find({
-    //   product: id,
-    //   status: { $nin: ["cancelled", "returned"] }
-    // }).select("startDate endDate -_id")
-    // return ApiResponse 200 with bookedDates
-
-    const bookedDates=[];
-    return res.status(200).json(
-        new ApiResponse(200,bookedDates,"SuccesFully Get Product availability")
-    )
-})
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, bookedDates, "SuccesFully Get Product availability")
+    );
+});
 
 const calculatePrice = AsyncHandler(async (req, res) => {
-  const {
-    id,
-    startDate,
-    endDate,
-    quantity,
-    pricelistId,
-  } = req.body;
+  const { id, startDate, endDate, quantity, pricelistId } = req.body;
 
   const product = await Product.findById(id);
 
@@ -423,21 +424,28 @@ const calculatePrice = AsyncHandler(async (req, res) => {
     quantity
   );
 
-  const {
-    discountedAmount,
-    discountAmount,
-  } = applyDiscount(
+  const { discountedAmount, discountAmount } = applyDiscount(
     calculatedPrice.baseAmount,
     priceList
   );
+
+  const taxAmount = discountedAmount * (product.taxPercent / 100);
+
+  const totalAmount = discountedAmount + taxAmount + product.depositAmount;
 
   return res.status(200).json(
     new ApiResponse(
       200,
       {
         ...calculatedPrice,
+
+        baseAmount: calculatedPrice.baseAmount,
+
         discountedAmount,
         discountAmount,
+
+        taxAmount,
+        totalAmount,
       },
       "Price calculated successfully"
     )
@@ -452,5 +460,5 @@ export {
   deleteProduct,
   updateStock,
   getProductAvailability,
-  calculatePrice
+  calculatePrice,
 };

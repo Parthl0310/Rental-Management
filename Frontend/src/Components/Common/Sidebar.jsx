@@ -91,6 +91,11 @@ export default function Sidebar() {
       icon: BarChart3,
     },
     {
+      label: "PriceList",
+      path: "/admin/pricelists",
+      icon: BarChart3,
+    },
+    {
       label: "Settings",
       path: "/admin/settings",
       icon: Settings,
