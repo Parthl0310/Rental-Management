@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart, Eye, Package, Star, Camera } from "lucide-react";
+import { useAuth } from "../../Context/Auth.context";
+import { checkWishlistAPI, toggleWishlistAPI } from "../../Api/Wishlist.api";
+import toast from "react-hot-toast";
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [currentImage, setCurrentImage] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const {
     _id,
@@ -63,11 +68,50 @@ export default function ProductCard({ product }) {
     navigate(`/customer/products/${_id}`);
   };
 
-  const handleWishlist = (e) => {
+  useEffect(() => {
+    const fetchWishlistStatus = async () => {
+      if (!user || user.role !== "customer") return;
+      try {
+        const res = await checkWishlistAPI(_id);
+        if (res && res.success) {
+          setIsWishlisted(res.data.isWishlisted);
+        }
+      } catch (err) {
+        console.error("Error checking wishlist status:", err);
+      }
+    };
+    fetchWishlistStatus();
+  }, [_id, user]);
+
+  const handleWishlist = async (e) => {
     e.stopPropagation();
 
-    // TODO:
-    // Add wishlist functionality
+    if (!user) {
+      toast.error("Please login first to add items to wishlist");
+      navigate("/login");
+      return;
+    }
+
+    if (user.role !== "customer") {
+      toast.error("Only customers can wishlist items");
+      return;
+    }
+
+    const previousStatus = isWishlisted;
+    setIsWishlisted(!isWishlisted);
+
+    try {
+      const res = await toggleWishlistAPI(_id);
+      if (res && res.success) {
+        toast.success(res.message);
+      } else {
+        setIsWishlisted(previousStatus);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || "Failed to toggle wishlist");
+      setIsWishlisted(previousStatus);
+    }
   };
 
   return (
@@ -98,7 +142,10 @@ export default function ProductCard({ product }) {
           onClick={handleWishlist}
           className="absolute top-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center hover:bg-slate-100"
         >
-          <Heart size={18} />
+          <Heart
+            size={18}
+            className={isWishlisted ? "fill-rose-500 text-rose-500" : "text-slate-600"}
+          />
         </button>
 
         {/* Photos Count */}

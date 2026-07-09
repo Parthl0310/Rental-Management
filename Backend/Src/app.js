@@ -25,12 +25,15 @@ import productRoute from "./Routes/product.routes.js"
 import pricelistRoute from "./Routes/pricelist.routes.js"
 import rentalRoute from "./Routes/rental.routes.js"
 import transferRoute from "./Routes/transfer.routes.js"
-
+import cartRoute from "./Routes/cart.routes.js"
+import wishlistRoute from "./Routes/wishlist.routes.js"
 app.use('/api/auth',authRouter)
 app.use('/api/user',userRoute)
 app.use('/api/products',productRoute)
 app.use('/api/pricelists',pricelistRoute)
 app.use('/api/rentals',rentalRoute)
 app.use("/api/transfers",transferRoute)
+app.use('/api/cart', cartRoute)
+app.use('/api/wishlist', wishlistRoute)
 
 export {app}

@@ -10,8 +10,7 @@ const isAdmin=AsyncHandler(async(req,res,next)=>{
 })
 
 const isCustomer=AsyncHandler(async(req,res,next)=>{
-    const {role}=req.body;
-
+    
     if(req.user.role !== "customer"){
         throw new ApiError(403, "Customer access required");    
     }

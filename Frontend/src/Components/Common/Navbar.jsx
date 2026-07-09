@@ -4,6 +4,7 @@ import { Home, Store,  Heart, ShoppingCart, Menu, X, User, LogOut, ChevronDown, 
 } from "lucide-react";
 import { useAuth } from "../../Context/Auth.context";
 import { logoutAPI } from "../../Api/Auth.api";
+import { useCart } from "../../Context/CartContext";
 
 export default function Navbar() {
   const { user, setUser } = useAuth();
@@ -15,7 +16,7 @@ export default function Navbar() {
   const profileRef = useRef(null);
   const drawerRef = useRef(null);
 
-  const cartCount = 3;
+  const { cartCount } = useCart();
 
   const logout = async () => {
     try {
@@ -88,15 +89,15 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-4">
             {/* Cart */}
 
-            <button className="relative w-12 h-12 rounded-2xl border border-slate-200 bg-white flex items-center justify-center transition hover:bg-sky-50">
+            <Link to="/customer/cart" className="relative w-12 h-12 rounded-2xl border border-slate-200 bg-white flex items-center justify-center transition hover:bg-sky-50">
               <ShoppingCart size={22} className="text-slate-700" />
 
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-sky-500 text-white text-xs flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
-            </button>
+            </Link>
 
             {/* Profile */}
 
@@ -159,15 +160,15 @@ export default function Navbar() {
           {/* ---------------- MOBILE HEADER ---------------- */}
 
           <div className="flex lg:hidden items-center gap-3">
-            <button className="relative w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center bg-white">
+            <Link to="/customer/cart" className="relative w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center bg-white">
               <ShoppingCart size={21} />
 
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-sky-500 text-white text-xs flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
-            </button>
+            </Link>
 
             <button
               onClick={() => setMenuOpen(true)}

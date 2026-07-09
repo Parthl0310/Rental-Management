@@ -1,4 +1,4 @@
-import { ApiError } from "../utils/ApiError.js";
+import { ApiError } from "../Utils/ApiError.js";
 
 const calculateRentalPrice = (
   product,

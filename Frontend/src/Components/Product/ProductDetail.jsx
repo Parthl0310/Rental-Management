@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 
 import toast from "react-hot-toast";
+import { useCart } from "../../Context/CartContext";
+import { useAuth } from "../../Context/Auth.context";
+import { checkWishlistAPI, toggleWishlistAPI } from "../../Api/Wishlist.api";
 
 import Navbar from "../../components/common/Navbar";
 import ImageGallery from "../../components/product/ImageGallery";
@@ -31,6 +34,9 @@ import {
 
 export default function ProductDetail() {
   const { productId } = useParams();
+  const { addItem } = useCart();
+  const { user } = useAuth();
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const [product, setProduct] =
     useState(null);
@@ -77,6 +83,48 @@ export default function ProductDetail() {
     }
   };
 
+  useEffect(() => {
+    const fetchWishlistStatus = async () => {
+      if (!user || user.role !== "customer" || !productId) return;
+      try {
+        const res = await checkWishlistAPI(productId);
+        if (res && res.success) {
+          setIsWishlisted(res.data.isWishlisted);
+        }
+      } catch (err) {
+        console.error("Error checking wishlist status:", err);
+      }
+    };
+    fetchWishlistStatus();
+  }, [productId, user]);
+
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      toast.error("Please login first to add items to wishlist");
+      return;
+    }
+    if (user.role !== "customer") {
+      toast.error("Only customers can wishlist items");
+      return;
+    }
+
+    const previousStatus = isWishlisted;
+    setIsWishlisted(!isWishlisted);
+
+    try {
+      const res = await toggleWishlistAPI(productId);
+      if (res && res.success) {
+        toast.success(res.message);
+      } else {
+        setIsWishlisted(previousStatus);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || "Failed to toggle wishlist");
+      setIsWishlisted(previousStatus);
+    }
+  };
+
   const handleQuantityDecrease =
     () => {
       if (quantity > 1) {
@@ -98,21 +146,36 @@ export default function ProductDetail() {
       }
     };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (
       !selectedDates.startDate ||
       !selectedDates.endDate
     ) {
       toast.error(
-        "Please select rental dates"
+        "Please select rental dates first"
       );
 
       return;
     }
 
-    toast.success(
-      "Added to cart (coming soon)"
-    );
+    if (quantity < 1) {
+      toast.error("Quantity must be at least 1");
+      return;
+    }
+
+    try {
+      await addItem({
+        productId,
+        quantity,
+        startDate: selectedDates.startDate,
+        endDate: selectedDates.endDate,
+      });
+      toast.success("Added to cart");
+    } catch (error) {
+      console.error(error);
+      const errMsg = error.response?.data?.message || error.message || "Failed to add to cart";
+      toast.error(errMsg);
+    }
   };
 
   const handleShare = async () => {
@@ -203,10 +266,14 @@ export default function ProductDetail() {
               />
 
               <button
+                onClick={handleToggleWishlist}
                 className="mt-5 w-full h-12 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2"
               >
-                <Heart size={18} />
-                Add To Wishlist
+                <Heart
+                  size={18}
+                  className={isWishlisted ? "fill-rose-500 text-rose-500" : "text-slate-600"}
+                />
+                {isWishlisted ? "Remove From Wishlist" : "Add To Wishlist"}
               </button>
 
             </div>
@@ -346,9 +413,7 @@ export default function ProductDetail() {
                 <button
                   onClick={handleAddToCart}
                   disabled={
-                    product.availableStock === 0 ||
-                    !selectedDates.startDate ||
-                    !selectedDates.endDate
+                    product.availableStock === 0
                   }
                   className="h-12 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium flex items-center justify-center gap-2"
                 >
